@@ -33,12 +33,15 @@
 
 #define PREF_ROOT "/plugins/ignore"
 
+#define CONV_TYPE_CHAT_ACTIVITY -1
+
 static PurpleCmdId cmd;
 
 typedef enum
 {
 	IGNORE_ALL     = 1 << 0,
-	IGNORE_CHAT    = 1 << 1
+	IGNORE_CHAT    = 1 << 1,
+	IGNORE_JOIN    = 1 << 2
 } IgnoreContext;
 
 static const char *
@@ -78,7 +81,17 @@ add_ignore_rule(IgnoreContext context, const char *name, PurpleAccount *account)
 	pref = g_ascii_strdown(string->str, string->len);
 	if (!purple_prefs_exists(pref)) {
 		GList *list = purple_prefs_get_string_list(PREF_ROOT "/rules");
-		purple_prefs_add_string(pref, context == IGNORE_ALL ? "all" : "chat");
+		switch (context) {
+		case IGNORE_ALL:
+			purple_prefs_add_string(pref, "all");
+			break;
+		case IGNORE_CHAT:
+			purple_prefs_add_string(pref, "chat");
+			break;
+		case IGNORE_JOIN:
+			purple_prefs_add_string(pref, "join");
+			break;
+		}
 		if (!g_list_find_custom(list, pref, (GCompareFunc)g_utf8_collate)) {
 			list = g_list_prepend(list, g_strdup(pref));
 			purple_prefs_set_string_list(PREF_ROOT "/rules", list);
@@ -86,7 +99,17 @@ add_ignore_rule(IgnoreContext context, const char *name, PurpleAccount *account)
 			g_list_free(list);
 		}
 	} else {
-		purple_prefs_set_string(pref, context == IGNORE_ALL ? "all" : "chat");
+		switch (context) {
+		case IGNORE_ALL:
+			purple_prefs_set_string(pref, "all");
+			break;
+		case IGNORE_CHAT:
+			purple_prefs_set_string(pref, "chat");
+			break;
+		case IGNORE_JOIN:
+			purple_prefs_set_string(pref, "join");
+			break;
+		}
 	}
 	g_string_free(string, TRUE);
 	g_free(pref);
@@ -153,6 +176,11 @@ ignore_cmd(PurpleConversation *conv, const char *cmd, char **arguments, char **e
 		context = IGNORE_CHAT;
 	}
 
+	if (strcmp(args[nargs], "-j") == 0) {
+		nargs++;
+		context = IGNORE_JOIN;
+	}
+
 	if (args[nargs] == NULL) {
 		goto end;
 	}
@@ -210,6 +238,11 @@ is_ignored(const char *name, PurpleAccount *account, PurpleConversationType type
 		return TRUE;
 	}
 
+	if (*pref == 'j' && type == CONV_TYPE_CHAT_ACTIVITY) {
+		purple_debug_info("ignore", "ignoring join/part from %s\n", name);
+		return TRUE;
+	}
+
 	return FALSE;
 }
 
@@ -223,7 +256,7 @@ receiving_msg(PurpleAccount *account, const char **who, const char **message,
 static gboolean
 chat_activity_cb(PurpleConversation *conv, const char *user, PurpleConvChatBuddyFlags flags)
 {
-	return is_ignored(user, purple_conversation_get_account(conv), PURPLE_CONV_TYPE_CHAT);
+	return is_ignored(user, purple_conversation_get_account(conv), CONV_TYPE_CHAT_ACTIVITY);
 }
 
 static gboolean
@@ -231,10 +264,11 @@ plugin_load(PurplePlugin *plugin)
 {
 	cmd = purple_cmd_register("ignore", "s", PURPLE_CMD_P_DEFAULT,
 				PURPLE_CMD_FLAG_CHAT | PURPLE_CMD_FLAG_IM | PURPLE_CMD_FLAG_ALLOW_WRONG_ARGS, NULL,
-				ignore_cmd, _("ignore [-c] [+&lt;ignore&gt; -&lt;unignore&gt;]<br>\
+				ignore_cmd, _("ignore [-c|-j] [+&lt;ignore&gt; -&lt;unignore&gt;]<br>\
 Examples:<br>\
    'ignore +StupidBot -NotABot' \t - (in a chat) Starts ignoring StupidBot, and removes NotABot from ignore list.<br>\
    'ignore -c +AnotherBot' \t - (in a chat) Starts ignoring AnotherBot, but only in chats.<br>\
+   'ignore -j +AnotherBot' \t - Starts ignoring join/part messages from AnotherBot.<br>\
    'ignore +' \t - (in an IM) Starts ignoring this person.<br>\
    'ignore -' \t - (in an IM) Starts unignoring this person.<br>\
    'ignore' \t - Lists the current ignore rules."), NULL);
