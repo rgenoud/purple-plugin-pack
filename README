@@ -9,3 +9,29 @@ also become a place to save plugins whose authors have since abandoned them.
 More information on the Plugin Pack can be found at
 http://plugins.guifications.org/trac/wiki/PluginPack
 
+rgenoud:
+I've imported this plugin pack from debian jessie source package :
+https://packages.debian.org/sid/pidgin-plugin-pack
+
+I've just modified the ignore plugin so that it can ignore only join/parts from
+specific users.
+(Some users are "unstable" and keep parting/joining from chatrooms. It seems to be
+a network problem (or a windows problem?))
+That's the reason this was made.
+
+Build instructions: (just for the ignore plugin)
+apt-get install pidgin-dev libpurple-dev
+In the purple plugin pack directory:
+./configure
+make -j $(nproc) && mkdir -p $HOME/.purple/plugins/ && cp ignore/.libs/ignore.so $HOME/.purple/plugins/
+
+Help:
+/help ignore
+ignore [-c|-j] [+<ignore> -<unignore>]
+Examples:
+   'ignore +StupidBot -NotABot'		 - (in a chat) Starts ignoring StupidBot, and removes NotABot from ignore list.
+   'ignore -c +AnotherBot'	 - (in a chat) Starts ignoring AnotherBot, but only in chats.
+   'ignore -j +AnotherBot'	 - Starts ignoring join/part messages from AnotherBot.
+   'ignore +'	 - (in an IM) Starts ignoring this person.
+   'ignore -'	 - (in an IM) Starts unignoring this person.
+   'ignore'	 - Lists the current ignore rules.
